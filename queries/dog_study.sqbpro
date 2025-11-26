@@ -1,1 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="dog_study.db" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="structure browser query" current="2"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="100"/><column_width id="3" width="1500"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><table title="demographics_form" custom_title="0" dock_id="4" table="4,17:maindemographics_form"/><dock_state state="000000ff00000000fd000000010000000200000774000003aafc0100000002fb000000160064006f0063006b00420072006f00770073006500310100000000000007740000000000000000fb000000160064006f0063006b00420072006f00770073006500340100000000000007740000010b00ffffff000007740000000000000004000000040000000800000008fc00000000"/><default_encoding codec=""/><browse_table_settings><table schema="main" name="demographics_form" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_" freeze_columns="0"><sort/><column_widths><column index="1" value="24"/><column index="2" value="128"/><column index="3" value="108"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table></browse_table_settings></tab_browse><tab_sql><sql name="SQL 1">--1. how many dogs were successfully screened? 12
+--count dogs with valid screening form_completion_date
+SELECT count(*) as screened_count
+FROM screening_form
+WHERE form_completion_date is not null
+	AND trim(form_completion_date) &lt;&gt; '';
 
+--2. eligible dogs? 4
+--dogs are eligibile if all elig_questions = 1 and all inelig_questions are not 1 and not null
+SELECT count(*) as eligible_count
+FROM screening_form
+WHERE elig_question_1 == 1
+	AND elig_question_2 == 1
+	AND elig_question_3 ==1
+	AND inelig_question_1 is not null
+	AND inelig_question_1 != 1
+	AND inelig_question_2 is not null
+	AND inelig_question_2 != 1;
+
+--2a. missing allowed? 7
+--allowing missing values on ineligibility questions
+SELECT count(*) as eligible_count_missing_allowed
+FROM screening_form
+WHERE elig_question_1 = 1
+	AND elig_question_2 = 1
+	AND elig_question_3 = 1
+	AND (inelig_question_1 IS NULL OR inelig_question_1 != 1)
+	AND (inelig_question_2 IS NULL OR inelig_question_2 != 1);
+
+--3. ready for enrollment? 4
+--must be eligible and withdrawl_status not 1 or 2
+SELECT count(*) as eligible_count
+FROM screening_form s
+LEFT JOIN request_to_withdraw_form r on r.id = s.id
+WHERE elig_question_1 == 1
+	AND elig_question_2 == 1
+	AND elig_question_3 == 1
+	AND inelig_question_1 is not null
+	AND inelig_question_1 != 1
+	AND inelig_question_2 is not null
+	AND inelig_question_2 != 1
+	AND (r.withdrawal_status is null or r.withdrawal_status not in (1,2));
+
+--4. dogs withdrawn? 2
+--count of withdrawl_status as 1 or 2
+SELECT count(*) as withdrawn_count
+FROM request_to_withdraw_form
+WHERE withdrawal_status in (1,2);
+
+--5. screened dogs older than 5? 6
+--dogs with a form_completion_date and older than 5 years
+SELECT count(*) as screened_older_than_5
+FROM screening_form s
+LEFT JOIN participant_info p on p.id = s.id
+WHERE s.form_completion_date is not null
+	AND (julianday(s.form_completion_date) - julianday(p.date_of_birth)) / 365.25 &gt; 5;
+
+--6. order to contact those ready to enroll starting with oldest form completion date
+SELECT p.id, p.name, s.form_completion_date
+FROM screening_form s
+LEFT JOIN participant_info p on p.id = s.id
+LEFT JOIN request_to_withdraw_form r on r.id = s.id
+WHERE elig_question_1 == 1
+	AND elig_question_2 == 1
+	AND elig_question_3 ==1
+	AND inelig_question_1 is not null
+	AND inelig_question_1 != 1
+	AND inelig_question_2 is not null
+	AND inelig_question_2 != 1
+	AND (r.withdrawal_status is null or r.withdrawal_status not in (1,2))
+ORDER BY date(form_completion_date) asc;
+</sql><current_tab id="0"/></tab_sql></sqlb_project>
